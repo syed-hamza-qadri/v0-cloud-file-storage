@@ -1,0 +1,170 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { Cloud, HardDrive, FileUp, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { UploadZone } from '@/components/upload-zone'
+import { FileList, type FileItem } from '@/components/file-list'
+
+export default function CloudStoragePage() {
+  const [files, setFiles] = useState<FileItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const fetchFiles = useCallback(async () => {
+    try {
+      const response = await fetch('/api/files')
+      if (!response.ok) throw new Error('Failed to fetch files')
+      const data = await response.json()
+      setFiles(data.files)
+    } catch (error) {
+      console.error('Error fetching files:', error)
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchFiles()
+  }, [fetchFiles])
+
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    fetchFiles()
+  }
+
+  const handleDelete = async (url: string) => {
+    try {
+      const response = await fetch('/api/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+
+      if (!response.ok) throw new Error('Delete failed')
+
+      setFiles(prev => prev.filter(f => f.url !== url))
+    } catch (error) {
+      console.error('Error deleting file:', error)
+    }
+  }
+
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+  const formatTotalSize = (bytes: number) => {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+              <Cloud className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">CloudVault</h1>
+              <p className="text-xs text-muted-foreground">Engineering File Storage</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        {/* Stats Cards */}
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="flex items-center gap-4 rounded-xl border bg-card p-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <FileUp className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{files.length}</p>
+              <p className="text-sm text-muted-foreground">Total Files</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 rounded-xl border bg-card p-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10">
+              <HardDrive className="h-6 w-6 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{formatTotalSize(totalSize)}</p>
+              <p className="text-sm text-muted-foreground">Storage Used</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 rounded-xl border bg-card p-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10">
+              <Cloud className="h-6 w-6 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">
+                {files.filter(f => 
+                  ['m', 'mat', 'mlx', 'ms14', 'ewprj'].includes(
+                    f.filename.split('.').pop()?.toLowerCase() || ''
+                  )
+                ).length}
+              </p>
+              <p className="text-sm text-muted-foreground">MATLAB / Multisim</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Upload Zone */}
+        <section className="mb-8">
+          <h2 className="mb-4 text-lg font-semibold">Upload Files</h2>
+          <UploadZone onUploadComplete={fetchFiles} />
+        </section>
+
+        {/* File List */}
+        <section>
+          <h2 className="mb-4 text-lg font-semibold">Your Files</h2>
+          <FileList files={files} isLoading={isLoading} onDelete={handleDelete} />
+        </section>
+
+        {/* Supported File Types */}
+        <section className="mt-12 rounded-xl border bg-muted/30 p-6">
+          <h3 className="mb-4 font-semibold">Supported File Types</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            <div>
+              <p className="font-medium text-orange-500">MATLAB</p>
+              <p className="text-muted-foreground">.m, .mat, .mlx, .fig, .slx</p>
+            </div>
+            <div>
+              <p className="font-medium text-emerald-500">Multisim</p>
+              <p className="text-muted-foreground">.ms14, .ewprj, .ewb</p>
+            </div>
+            <div>
+              <p className="font-medium text-blue-500">Code</p>
+              <p className="text-muted-foreground">.py, .js, .c, .cpp, .java</p>
+            </div>
+            <div>
+              <p className="font-medium text-muted-foreground">All Others</p>
+              <p className="text-muted-foreground">PDF, images, archives...</p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t py-6">
+        <div className="mx-auto max-w-6xl px-4 text-center text-sm text-muted-foreground">
+          <p>CloudVault - Fast, secure cloud storage for your engineering files</p>
+        </div>
+      </footer>
+    </div>
+  )
+}
