@@ -1,40 +1,42 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Cloud, HardDrive, FileUp, RefreshCw } from 'lucide-react'
+import useSWR from 'swr'
+import { Cloud, HardDrive, FileUp, RefreshCw, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { UploadZone } from '@/components/upload-zone'
 import { FileList, type FileItem } from '@/components/file-list'
 
+const fetcher = (url: string) => fetch(url).then(res => res.json())
+
 export default function CloudStoragePage() {
-  const [files, setFiles] = useState<FileItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
-  const fetchFiles = useCallback(async () => {
-    try {
-      const response = await fetch('/api/files')
-      if (!response.ok) throw new Error('Failed to fetch files')
-      const data = await response.json()
-      setFiles(data.files)
-    } catch (error) {
-      console.error('Error fetching files:', error)
-    } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
+  const { data, error, isLoading, mutate } = useSWR<{ files: FileItem[] }>(
+    '/api/files',
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 2000,
     }
-  }, [])
+  )
 
-  useEffect(() => {
-    fetchFiles()
-  }, [fetchFiles])
+  const files = data?.files || []
+  const isRefreshing = isLoading
 
   const handleRefresh = () => {
-    setIsRefreshing(true)
-    fetchFiles()
+    mutate()
+  }
+
+  const handleUploadComplete = () => {
+    // Revalidate immediately after upload
+    mutate()
   }
 
   const handleDelete = async (url: string) => {
+    // Optimistic update - remove file immediately from UI
+    mutate(
+      { files: files.filter(f => f.url !== url) },
+      false
+    )
+
     try {
       const response = await fetch('/api/delete', {
         method: 'DELETE',
@@ -43,10 +45,13 @@ export default function CloudStoragePage() {
       })
 
       if (!response.ok) throw new Error('Delete failed')
-
-      setFiles(prev => prev.filter(f => f.url !== url))
+      
+      // Revalidate to confirm deletion
+      mutate()
     } catch (error) {
       console.error('Error deleting file:', error)
+      // Revert on error
+      mutate()
     }
   }
 
@@ -73,15 +78,21 @@ export default function CloudStoragePage() {
               <p className="text-xs text-muted-foreground">Engineering File Storage</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 sm:flex">
+              <Zap className="h-3 w-3" />
+              Edge-Powered
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -125,8 +136,11 @@ export default function CloudStoragePage() {
 
         {/* Upload Zone */}
         <section className="mb-8">
-          <h2 className="mb-4 text-lg font-semibold">Upload Files</h2>
-          <UploadZone onUploadComplete={fetchFiles} />
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Upload Files</h2>
+            <span className="text-xs text-muted-foreground">5 parallel uploads for max speed</span>
+          </div>
+          <UploadZone onUploadComplete={handleUploadComplete} />
         </section>
 
         {/* File List */}
@@ -186,6 +200,20 @@ export default function CloudStoragePage() {
             <div>
               <p className="font-medium text-cyan-500">Audio</p>
               <p className="text-muted-foreground">.mp3, .wav, .ogg, .flac</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Performance Info */}
+        <section className="mt-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <Zap className="mt-0.5 h-5 w-5 text-emerald-500" />
+            <div>
+              <h4 className="font-medium text-emerald-700 dark:text-emerald-400">Optimized for Speed</h4>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Edge runtime for ultra-fast API responses, parallel uploads (5 concurrent), 
+                SWR caching for instant UI updates, and optimistic updates for seamless interactions.
+              </p>
             </div>
           </div>
         </section>

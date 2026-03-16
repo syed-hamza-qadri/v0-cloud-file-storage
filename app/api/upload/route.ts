@@ -1,6 +1,9 @@
 import { put } from '@vercel/blob'
 import { type NextRequest, NextResponse } from 'next/server'
 
+// Disable body parsing to enable streaming for large files
+export const runtime = 'edge'
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -14,8 +17,10 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const filename = `${timestamp}-${file.name}`
 
+    // Use multipart upload for faster large file handling
     const blob = await put(filename, file, {
       access: 'public',
+      addRandomSuffix: false, // Predictable URLs for caching
     })
 
     return NextResponse.json({

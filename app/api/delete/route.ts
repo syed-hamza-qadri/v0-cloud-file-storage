@@ -1,6 +1,9 @@
 import { del } from '@vercel/blob'
 import { type NextRequest, NextResponse } from 'next/server'
 
+// Use edge runtime for fastest response
+export const runtime = 'edge'
+
 export async function DELETE(request: NextRequest) {
   try {
     const { url } = await request.json()

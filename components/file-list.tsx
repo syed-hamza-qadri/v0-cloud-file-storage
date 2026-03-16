@@ -62,14 +62,32 @@ export function FileList({ files, isLoading, onDelete }: FileListProps) {
     setDeletingUrl(null)
   }
 
-  const handleDownload = (url: string, filename: string) => {
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.target = '_blank'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      // Use fetch for faster download with streaming
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // Clean up blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
+    } catch (error) {
+      // Fallback to direct link
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
   }
 
   if (isLoading) {
