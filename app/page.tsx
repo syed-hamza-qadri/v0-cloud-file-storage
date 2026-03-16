@@ -138,7 +138,7 @@ export default function CloudStoragePage() {
         {/* Supported File Types */}
         <section className="mt-12 rounded-xl border bg-muted/30 p-6">
           <h3 className="mb-4 font-semibold">Supported File Types</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
             <div>
               <p className="font-medium text-orange-500">MATLAB</p>
               <p className="text-muted-foreground">.m, .mat, .mlx, .fig, .slx</p>
@@ -148,12 +148,44 @@ export default function CloudStoragePage() {
               <p className="text-muted-foreground">.ms14, .ewprj, .ewb</p>
             </div>
             <div>
-              <p className="font-medium text-blue-500">Code</p>
-              <p className="text-muted-foreground">.py, .js, .c, .cpp, .java</p>
+              <p className="font-medium text-yellow-500">Archives</p>
+              <p className="text-muted-foreground">.zip, .rar, .7z, .tar, .gz</p>
             </div>
             <div>
-              <p className="font-medium text-muted-foreground">All Others</p>
-              <p className="text-muted-foreground">PDF, images, archives...</p>
+              <p className="font-medium text-amber-500">Data</p>
+              <p className="text-muted-foreground">.json, .xml, .csv, .yaml</p>
+            </div>
+            <div>
+              <p className="font-medium text-violet-500">Database</p>
+              <p className="text-muted-foreground">.sql, .db, .sqlite, .mdb</p>
+            </div>
+            <div>
+              <p className="font-medium text-red-500">Documents</p>
+              <p className="text-muted-foreground">.pdf, .doc, .docx, .txt, .rtf</p>
+            </div>
+            <div>
+              <p className="font-medium text-rose-500">Presentations</p>
+              <p className="text-muted-foreground">.ppt, .pptx, .odp, .key</p>
+            </div>
+            <div>
+              <p className="font-medium text-green-500">Spreadsheets</p>
+              <p className="text-muted-foreground">.xlsx, .xls, .csv, .ods</p>
+            </div>
+            <div>
+              <p className="font-medium text-blue-500">Code</p>
+              <p className="text-muted-foreground">.py, .js, .ts, .c, .cpp, .java</p>
+            </div>
+            <div>
+              <p className="font-medium text-pink-500">Images</p>
+              <p className="text-muted-foreground">.jpg, .png, .gif, .svg, .webp</p>
+            </div>
+            <div>
+              <p className="font-medium text-purple-500">Video</p>
+              <p className="text-muted-foreground">.mp4, .avi, .mov, .mkv</p>
+            </div>
+            <div>
+              <p className="font-medium text-cyan-500">Audio</p>
+              <p className="text-muted-foreground">.mp3, .wav, .ogg, .flac</p>
             </div>
           </div>
         </section>
