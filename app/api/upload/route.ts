@@ -17,10 +17,10 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const filename = `${timestamp}-${file.name}`
 
-    // Use multipart upload for faster large file handling
+    // Use private access for secure file storage
     const blob = await put(filename, file, {
-      access: 'public',
-      addRandomSuffix: false, // Predictable URLs for caching
+      access: 'private',
+      addRandomSuffix: false,
     })
 
     return NextResponse.json({

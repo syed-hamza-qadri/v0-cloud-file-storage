@@ -62,32 +62,16 @@ export function FileList({ files, isLoading, onDelete }: FileListProps) {
     setDeletingUrl(null)
   }
 
-  const handleDownload = async (url: string, filename: string) => {
-    try {
-      // Use fetch for faster download with streaming
-      const response = await fetch(url)
-      const blob = await response.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
-      // Clean up blob URL
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
-    } catch (error) {
-      // Fallback to direct link
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.target = '_blank'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
+  const handleDownload = async (pathname: string, filename: string) => {
+    // Use our file serving API for private blob downloads
+    const downloadUrl = `/api/file?pathname=${encodeURIComponent(pathname)}`
+    
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   if (isLoading) {
@@ -162,7 +146,7 @@ export function FileList({ files, isLoading, onDelete }: FileListProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDownload(file.url, file.filename)}
+                  onClick={() => handleDownload(file.pathname, file.filename)}
                   className="hidden sm:flex"
                 >
                   <Download className="mr-2 h-4 w-4" />
@@ -175,21 +159,21 @@ export function FileList({ files, isLoading, onDelete }: FileListProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleDownload(file.url, file.filename)}>
+                    <DropdownMenuItem onClick={() => handleDownload(file.pathname, file.filename)}>
                       <Download className="mr-2 h-4 w-4" />
                       Download
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => window.open(file.url, '_blank')}>
+                    <DropdownMenuItem onClick={() => window.open(`/api/file?pathname=${encodeURIComponent(file.pathname)}`, '_blank')}>
                       <ExternalLink className="mr-2 h-4 w-4" />
                       Open in new tab
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => handleDelete(file.url)}
+                      onClick={() => handleDelete(file.pathname)}
                       className="text-destructive focus:text-destructive"
-                      disabled={deletingUrl === file.url}
+                      disabled={deletingUrl === file.pathname}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      {deletingUrl === file.url ? 'Deleting...' : 'Delete'}
+                      {deletingUrl === file.pathname ? 'Deleting...' : 'Delete'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -211,21 +195,21 @@ export function FileList({ files, isLoading, onDelete }: FileListProps) {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleDownload(file.url, file.filename)}>
+                  <DropdownMenuItem onClick={() => handleDownload(file.pathname, file.filename)}>
                     <Download className="mr-2 h-4 w-4" />
                     Download
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => window.open(file.url, '_blank')}>
+                  <DropdownMenuItem onClick={() => window.open(`/api/file?pathname=${encodeURIComponent(file.pathname)}`, '_blank')}>
                     <ExternalLink className="mr-2 h-4 w-4" />
                     Open in new tab
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => handleDelete(file.url)}
+                    onClick={() => handleDelete(file.pathname)}
                     className="text-destructive focus:text-destructive"
-                    disabled={deletingUrl === file.url}
+                    disabled={deletingUrl === file.pathname}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    {deletingUrl === file.url ? 'Deleting...' : 'Delete'}
+                    {deletingUrl === file.pathname ? 'Deleting...' : 'Delete'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

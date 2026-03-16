@@ -30,10 +30,10 @@ export default function CloudStoragePage() {
     mutate()
   }
 
-  const handleDelete = async (url: string) => {
+  const handleDelete = async (pathname: string) => {
     // Optimistic update - remove file immediately from UI
     mutate(
-      { files: files.filter(f => f.url !== url) },
+      { files: files.filter(f => f.pathname !== pathname) },
       false
     )
 
@@ -41,7 +41,7 @@ export default function CloudStoragePage() {
       const response = await fetch('/api/delete', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ pathname }),
       })
 
       if (!response.ok) throw new Error('Delete failed')

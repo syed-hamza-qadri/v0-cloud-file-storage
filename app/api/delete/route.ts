@@ -6,13 +6,13 @@ export const runtime = 'edge'
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { url } = await request.json()
+    const { pathname } = await request.json()
 
-    if (!url) {
-      return NextResponse.json({ error: 'No URL provided' }, { status: 400 })
+    if (!pathname) {
+      return NextResponse.json({ error: 'No pathname provided' }, { status: 400 })
     }
 
-    await del(url)
+    await del(pathname)
 
     return NextResponse.json({ success: true })
   } catch (error) {
