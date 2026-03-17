@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
-import { Upload, X, Check, Loader2 } from 'lucide-react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { Upload, X, Check, Loader2, FileUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface UploadZoneProps {
@@ -14,23 +14,13 @@ interface UploadingFile {
   status: 'uploading' | 'complete' | 'error'
 }
 
-const MAX_CONCURRENT_UPLOADS = 5
+const MAX_CONCURRENT_UPLOADS = 6
 
 export function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([])
   const uploadQueueRef = useRef<File[]>([])
   const activeUploadsRef = useRef(0)
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }, [])
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }, [])
 
   const processQueue = useCallback(() => {
     while (
@@ -67,13 +57,16 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
       setTimeout(() => {
         setUploadingFiles(prev => prev.filter(f => f.id !== id))
-      }, 1500)
+      }, 1000)
 
       onUploadComplete()
     } catch {
       setUploadingFiles(prev =>
         prev.map(f => f.id === id ? { ...f, status: 'error' } : f)
       )
+      setTimeout(() => {
+        setUploadingFiles(prev => prev.filter(f => f.id !== id))
+      }, 2000)
     } finally {
       activeUploadsRef.current--
       processQueue()
@@ -84,6 +77,43 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
     uploadQueueRef.current.push(...files)
     processQueue()
   }, [processQueue])
+
+  // Global Ctrl+V paste handler for non-image files
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      const files: File[] = []
+      for (const item of items) {
+        // Skip images - handled by PasteZone
+        if (item.type.startsWith('image/')) continue
+        
+        if (item.kind === 'file') {
+          const file = item.getAsFile()
+          if (file) files.push(file)
+        }
+      }
+
+      if (files.length > 0) {
+        e.preventDefault()
+        queueFiles(files)
+      }
+    }
+
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  }, [queueFiles])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }, [])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -98,19 +128,21 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
     e.target.value = ''
   }, [queueFiles])
 
-  const removeFile = (id: string) => {
-    setUploadingFiles(prev => prev.filter(f => f.id !== id))
-  }
-
   return (
-    <div className="space-y-3">
+    <div className="rounded-lg border bg-card">
+      <div className="flex items-center gap-2 border-b p-3">
+        <FileUp className="h-4 w-4" />
+        <span className="text-sm font-medium">Files</span>
+        <span className="text-xs text-muted-foreground">(Drag, click, or Ctrl+V)</span>
+      </div>
+
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
-          isDragging ? 'border-foreground bg-muted' : 'border-border hover:border-foreground/50'
+          'relative cursor-pointer p-4 transition-colors',
+          isDragging && 'bg-muted'
         )}
       >
         <input
@@ -119,35 +151,28 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
           onChange={handleFileSelect}
           className="absolute inset-0 cursor-pointer opacity-0"
         />
-        <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Drop files or click to upload
-        </p>
-      </div>
 
-      {uploadingFiles.length > 0 && (
-        <div className="space-y-2">
-          {uploadingFiles.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-3 rounded-lg border p-2 text-sm"
-            >
-              <span className="flex-1 truncate">{item.file.name}</span>
-              {item.status === 'uploading' && (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              )}
-              {item.status === 'complete' && (
-                <Check className="h-4 w-4" />
-              )}
-              {item.status === 'error' && (
-                <button onClick={() => removeFile(item.id)} className="p-1 hover:bg-muted rounded">
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+        {uploadingFiles.length > 0 ? (
+          <div className="space-y-1">
+            {uploadingFiles.slice(0, 4).map((item) => (
+              <div key={item.id} className="flex items-center gap-2 text-sm">
+                {item.status === 'uploading' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {item.status === 'complete' && <Check className="h-3.5 w-3.5" />}
+                {item.status === 'error' && <X className="h-3.5 w-3.5 text-destructive" />}
+                <span className="truncate text-xs">{item.file.name}</span>
+              </div>
+            ))}
+            {uploadingFiles.length > 4 && (
+              <p className="text-xs text-muted-foreground">+{uploadingFiles.length - 4} more</p>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-2 text-center">
+            <Upload className={cn('mb-1 h-6 w-6 text-muted-foreground/50', isDragging && 'scale-110')} />
+            <p className="text-xs text-muted-foreground">Drop files or click to upload</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
