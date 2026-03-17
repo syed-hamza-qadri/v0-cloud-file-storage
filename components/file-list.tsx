@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Trash2, MoreVertical, Search, Grid3X3, List, ExternalLink } from 'lucide-react'
+import { Download, Trash2, MoreVertical, Search, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,8 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { FileIcon, getFileTypeLabel } from './file-icon'
-import { cn } from '@/lib/utils'
+import { FileIcon, getFileTypeLabel, isTextFile } from './file-icon'
 
 export interface FileItem {
   url: string
@@ -25,7 +24,7 @@ export interface FileItem {
 interface FileListProps {
   files: FileItem[]
   isLoading: boolean
-  onDelete: (url: string) => void
+  onDelete: (pathname: string) => void
 }
 
 function formatFileSize(bytes: number): string {
@@ -41,7 +40,6 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -49,23 +47,21 @@ function formatDate(dateString: string): string {
 
 export function FileList({ files, isLoading, onDelete }: FileListProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const filteredFiles = files.filter(file =>
     file.filename.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleDelete = async (url: string) => {
-    setDeletingUrl(url)
-    await onDelete(url)
+  const handleDelete = async (pathname: string) => {
+    setDeletingUrl(pathname)
+    await onDelete(pathname)
     setDeletingUrl(null)
   }
 
   const handleDownload = async (pathname: string, filename: string) => {
-    // Use our file serving API for private blob downloads
     const downloadUrl = `/api/file?pathname=${encodeURIComponent(pathname)}`
-    
     const link = document.createElement('a')
     link.href = downloadUrl
     link.download = filename
@@ -74,87 +70,91 @@ export function FileList({ files, isLoading, onDelete }: FileListProps) {
     document.body.removeChild(link)
   }
 
+  const handleCopyContent = async (pathname: string) => {
+    try {
+      const response = await fetch(`/api/file?pathname=${encodeURIComponent(pathname)}`)
+      const text = await response.text()
+      await navigator.clipboard.writeText(text)
+      setCopiedId(pathname)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch (error) {
+      console.error('Copy failed:', error)
+    }
+  }
+
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="flex h-32 items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Search and View Toggle */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex items-center rounded-lg border bg-muted/50 p-1">
-          <button
-            onClick={() => setViewMode('list')}
-            className={cn(
-              'rounded-md p-2 transition-colors',
-              viewMode === 'list' ? 'bg-background shadow-sm' : 'hover:bg-background/50'
-            )}
-          >
-            <List className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('grid')}
-            className={cn(
-              'rounded-md p-2 transition-colors',
-              viewMode === 'grid' ? 'bg-background shadow-sm' : 'hover:bg-background/50'
-            )}
-          >
-            <Grid3X3 className="h-4 w-4" />
-          </button>
-        </div>
+    <div className="space-y-3">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search files..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {/* File List */}
       {filteredFiles.length === 0 ? (
-        <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30">
-          <p className="text-muted-foreground">
+        <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed">
+          <p className="text-sm text-muted-foreground">
             {searchQuery ? 'No files match your search' : 'No files uploaded yet'}
           </p>
         </div>
-      ) : viewMode === 'list' ? (
-        <div className="divide-y rounded-xl border bg-card">
+      ) : (
+        <div className="divide-y rounded-lg border">
           {filteredFiles.map((file) => (
             <div
-              key={file.url}
-              className="flex items-center gap-4 p-4 transition-colors hover:bg-muted/50"
+              key={file.pathname}
+              className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/50"
             >
-              <FileIcon filename={file.filename} />
+              <FileIcon filename={file.filename} className="h-8 w-8 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="truncate font-medium">{file.filename}</p>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-                    {getFileTypeLabel(file.filename)}
-                  </span>
+                <p className="truncate text-sm font-medium">{file.filename}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{getFileTypeLabel(file.filename)}</span>
+                  <span>·</span>
                   <span>{formatFileSize(file.size)}</span>
+                  <span className="hidden sm:inline">·</span>
                   <span className="hidden sm:inline">{formatDate(file.uploadedAt)}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {/* Copy button for text files */}
+                {isTextFile(file.filename) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleCopyContent(file.pathname)}
+                  >
+                    {copiedId === file.pathname ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
                   onClick={() => handleDownload(file.pathname, file.filename)}
-                  className="hidden sm:flex"
                 >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download
+                  <Download className="h-4 w-4" />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -163,10 +163,12 @@ export function FileList({ files, isLoading, onDelete }: FileListProps) {
                       <Download className="mr-2 h-4 w-4" />
                       Download
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => window.open(`/api/file?pathname=${encodeURIComponent(file.pathname)}`, '_blank')}>
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Open in new tab
-                    </DropdownMenuItem>
+                    {isTextFile(file.filename) && (
+                      <DropdownMenuItem onClick={() => handleCopyContent(file.pathname)}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy content
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onClick={() => handleDelete(file.pathname)}
                       className="text-destructive focus:text-destructive"
@@ -178,47 +180,6 @@ export function FileList({ files, isLoading, onDelete }: FileListProps) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {filteredFiles.map((file) => (
-            <div
-              key={file.url}
-              className="group relative flex flex-col items-center rounded-xl border bg-card p-4 transition-all hover:shadow-md"
-            >
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="absolute right-2 top-2 rounded-full p-1 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100">
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleDownload(file.pathname, file.filename)}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => window.open(`/api/file?pathname=${encodeURIComponent(file.pathname)}`, '_blank')}>
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Open in new tab
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleDelete(file.pathname)}
-                    className="text-destructive focus:text-destructive"
-                    disabled={deletingUrl === file.pathname}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {deletingUrl === file.pathname ? 'Deleting...' : 'Delete'}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <FileIcon filename={file.filename} className="mb-3 h-12 w-12" />
-              <p className="w-full truncate text-center text-sm font-medium">{file.filename}</p>
-              <span className="mt-1 text-xs text-muted-foreground">{formatFileSize(file.size)}</span>
-              <span className="mt-1 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-                {getFileTypeLabel(file.filename)}
-              </span>
             </div>
           ))}
         </div>
