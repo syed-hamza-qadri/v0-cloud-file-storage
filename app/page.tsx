@@ -15,7 +15,8 @@ export default function CloudStoragePage() {
     fetcher,
     {
       revalidateOnFocus: false,
-      dedupingInterval: 2000,
+      dedupingInterval: 500,
+      refreshInterval: 0,
     }
   )
 
