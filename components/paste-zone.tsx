@@ -30,28 +30,15 @@ export function PasteZone() {
   const images = data?.images || []
 
   const handlePaste = useCallback(async (e: ClipboardEvent) => {
-    console.log('[v0] Paste event detected')
     const items = e.clipboardData?.items
-    if (!items) {
-      console.log('[v0] No clipboard items')
-      return
-    }
-
-    console.log('[v0] Clipboard items count:', items.length)
-    for (let i = 0; i < items.length; i++) {
-      console.log('[v0] Item', i, '- kind:', items[i].kind, 'type:', items[i].type)
-    }
+    if (!items) return
 
     for (const item of items) {
       if (item.type.startsWith('image/')) {
         e.preventDefault()
         const file = item.getAsFile()
-        if (!file) {
-          console.log('[v0] Could not get file from item')
-          continue
-        }
+        if (!file) continue
 
-        console.log('[v0] Got image file:', file.name, 'size:', file.size)
         setIsUploading(true)
         setUploadProgress('Uploading...')
 
@@ -59,28 +46,19 @@ export function PasteZone() {
           const formData = new FormData()
           formData.append('file', file)
 
-          console.log('[v0] Sending to /api/images')
           const response = await fetch('/api/images', {
             method: 'POST',
             body: formData,
           })
 
-          console.log('[v0] Response status:', response.status)
-          if (!response.ok) {
-            const errorData = await response.json()
-            console.log('[v0] Error response:', errorData)
-            throw new Error('Upload failed')
-          }
-
-          const data = await response.json()
-          console.log('[v0] Upload success:', data)
+          if (!response.ok) throw new Error('Upload failed')
 
           setUploadProgress('Done')
           mutate()
           
           setTimeout(() => setUploadProgress(''), 1000)
         } catch (error) {
-          console.error('[v0] Upload error:', error)
+          console.error('Upload error:', error)
           setUploadProgress('Failed')
           setTimeout(() => setUploadProgress(''), 1500)
         } finally {

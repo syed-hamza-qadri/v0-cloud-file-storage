@@ -29,16 +29,12 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('[v0] Images API POST called')
     const formData = await request.formData()
     const file = formData.get('file') as File
 
     if (!file) {
-      console.log('[v0] No file in formData')
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
-
-    console.log('[v0] Uploading image:', file.name, 'size:', file.size, 'type:', file.type)
 
     // Generate unique filename
     const timestamp = Date.now()
@@ -50,16 +46,14 @@ export async function POST(request: NextRequest) {
       addRandomSuffix: false,
     })
 
-    console.log('[v0] Image upload success:', blob.pathname)
-
     return NextResponse.json({
       pathname: blob.pathname,
       filename: blob.pathname.replace(IMAGES_PREFIX, ''),
       uploadedAt: blob.uploadedAt,
     })
   } catch (error) {
-    console.error('[v0] Image upload error:', error)
-    return NextResponse.json({ error: 'Upload failed', details: String(error) }, { status: 500 })
+    console.error('Upload error:', error)
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 }
 

@@ -6,16 +6,12 @@ export const runtime = 'edge'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('[v0] Upload API called')
     const formData = await request.formData()
     const file = formData.get('file') as File
 
     if (!file) {
-      console.log('[v0] No file in formData')
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
-
-    console.log('[v0] Uploading file:', file.name, 'size:', file.size, 'type:', file.type)
 
     // Generate a unique filename with timestamp
     const timestamp = Date.now()
@@ -27,8 +23,6 @@ export async function POST(request: NextRequest) {
       addRandomSuffix: false,
     })
 
-    console.log('[v0] Upload success:', blob.pathname)
-
     return NextResponse.json({
       url: blob.url,
       pathname: blob.pathname,
@@ -38,7 +32,7 @@ export async function POST(request: NextRequest) {
       uploadedAt: blob.uploadedAt,
     })
   } catch (error) {
-    console.error('[v0] Upload error:', error)
-    return NextResponse.json({ error: 'Upload failed', details: String(error) }, { status: 500 })
+    console.error('Upload error:', error)
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 }
