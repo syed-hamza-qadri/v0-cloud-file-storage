@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { UploadZone } from '@/components/upload-zone'
 import { FileList, type FileItem } from '@/components/file-list'
 import { TextEditor } from '@/components/text-editor'
+import { PasteZone } from '@/components/paste-zone'
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
@@ -96,6 +97,11 @@ export default function CloudStoragePage() {
             <span className="text-muted-foreground">used</span>
           </div>
         </div>
+
+        {/* Paste Zone - Ctrl+V images sync across all devices */}
+        <section className="mb-6">
+          <PasteZone />
+        </section>
 
         {/* Real-time Shared Text - Syncs across all devices */}
         <section className="mb-6">
