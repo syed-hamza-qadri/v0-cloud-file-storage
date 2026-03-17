@@ -38,18 +38,28 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const uploadSingleFile = async (file: File) => {
     const id = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
     
+    console.log('[v0] Uploading file:', file.name, 'size:', file.size, 'type:', file.type)
     setUploadingFiles(prev => [...prev, { id, file, status: 'uploading' }])
 
     try {
       const formData = new FormData()
       formData.append('file', file)
 
+      console.log('[v0] Sending to /api/upload')
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
 
-      if (!response.ok) throw new Error('Upload failed')
+      console.log('[v0] Response status:', response.status)
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.log('[v0] Error response:', errorData)
+        throw new Error('Upload failed')
+      }
+      
+      const data = await response.json()
+      console.log('[v0] Upload success:', data)
 
       setUploadingFiles(prev =>
         prev.map(f => f.id === id ? { ...f, status: 'complete' } : f)

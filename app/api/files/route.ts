@@ -15,7 +15,13 @@ export async function GET(request: NextRequest) {
       limit,
     })
 
-    const files = blobs.map((blob) => {
+    // Filter out images and notes (they have their own APIs)
+    const filteredBlobs = blobs.filter(blob => 
+      !blob.pathname.startsWith('_pasted_images_/') && 
+      !blob.pathname.startsWith('_shared_note')
+    )
+
+    const files = filteredBlobs.map((blob) => {
       // Extract original filename (remove timestamp prefix)
       const pathname = blob.pathname
       const parts = pathname.split('/')
