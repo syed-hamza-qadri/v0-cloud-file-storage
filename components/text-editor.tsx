@@ -12,9 +12,11 @@ export function TextEditor() {
   const [isSaving, setIsSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [lastSavedText, setLastSavedText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const isLocalChange = useRef(false)
+  const lastTypingTime = useRef(0)
+  const isFocused = useRef(false)
 
   // Real-time sync - poll every 2 seconds for updates from other devices
   const { data, mutate } = useSWR<{ content: string; updatedAt: string | null }>(
@@ -22,18 +24,32 @@ export function TextEditor() {
     fetcher,
     {
       refreshInterval: 2000,
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       dedupingInterval: 1000,
     }
   )
 
-  // Sync remote changes to local state (only if not currently editing)
+  // Sync remote changes to local state ONLY if:
+  // 1. User is not focused on textarea, OR
+  // 2. User hasn't typed in the last 3 seconds AND remote content differs from last saved
   useEffect(() => {
-    if (data?.content !== undefined && !isLocalChange.current) {
-      setLocalText(data.content)
+    if (data?.content === undefined) return
+    
+    const now = Date.now()
+    const timeSinceTyping = now - lastTypingTime.current
+    const remoteContent = data.content || ''
+    
+    // If user is actively typing (within 3 seconds), don't overwrite
+    if (timeSinceTyping < 3000 && isFocused.current) {
+      return
     }
-    isLocalChange.current = false
-  }, [data?.content])
+    
+    // If content from server is different from what we last saved, update
+    if (remoteContent !== lastSavedText) {
+      setLocalText(remoteContent)
+      setLastSavedText(remoteContent)
+    }
+  }, [data?.content, lastSavedText])
 
   // Auto-save function
   const saveText = useCallback(async (content: string) => {
@@ -49,6 +65,7 @@ export function TextEditor() {
 
       if (!response.ok) throw new Error('Save failed')
       
+      setLastSavedText(content)
       setSaveStatus('saved')
       mutate({ content, updatedAt: new Date().toISOString() }, false)
       
@@ -63,7 +80,7 @@ export function TextEditor() {
 
   // Real-time auto-save with debounce (300ms after user stops typing)
   const handleTextChange = (newText: string) => {
-    isLocalChange.current = true
+    lastTypingTime.current = Date.now()
     setLocalText(newText)
 
     if (saveTimeoutRef.current) {
@@ -73,6 +90,14 @@ export function TextEditor() {
     saveTimeoutRef.current = setTimeout(() => {
       saveText(newText)
     }, 300)
+  }
+
+  const handleFocus = () => {
+    isFocused.current = true
+  }
+
+  const handleBlur = () => {
+    isFocused.current = false
   }
 
   const handleCopy = async () => {
@@ -93,6 +118,7 @@ export function TextEditor() {
     }
     
     setLocalText('')
+    setLastSavedText('')
     setSaveStatus('saving')
     
     try {
@@ -109,6 +135,7 @@ export function TextEditor() {
   }
 
   const handleRefresh = () => {
+    lastTypingTime.current = 0
     mutate()
   }
 
@@ -174,6 +201,8 @@ export function TextEditor() {
         ref={textareaRef}
         value={localText}
         onChange={(e) => handleTextChange(e.target.value)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         placeholder="Start typing... syncs in real-time across all devices"
         className="min-h-[200px] w-full resize-y bg-transparent p-4 font-mono text-sm focus:outline-none"
         style={{ whiteSpace: 'pre-wrap' }}
