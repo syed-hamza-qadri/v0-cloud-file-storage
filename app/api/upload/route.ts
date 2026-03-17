@@ -32,7 +32,21 @@ export async function POST(request: NextRequest) {
       uploadedAt: blob.uploadedAt,
     })
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Upload failed'
     console.error('Upload error:', error)
+    
+    // Handle specific Blob errors
+    if (errorMessage.includes('suspended')) {
+      return NextResponse.json({ 
+        error: 'Storage suspended - Check your Vercel Blob account status and billing' 
+      }, { status: 503 })
+    }
+    if (errorMessage.includes('quota')) {
+      return NextResponse.json({ 
+        error: 'Storage quota exceeded - Delete some files or upgrade your plan' 
+      }, { status: 507 })
+    }
+    
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 }

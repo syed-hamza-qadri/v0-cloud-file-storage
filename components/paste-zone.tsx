@@ -16,6 +16,7 @@ interface PastedImage {
 export function PasteZone() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<string>('')
+  const [errorMessage, setErrorMessage] = useState<string>('')
 
   const { data, mutate, isLoading } = useSWR<{ images: PastedImage[] }>(
     '/api/images',
@@ -51,16 +52,26 @@ export function PasteZone() {
             body: formData,
           })
 
-          if (!response.ok) throw new Error('Upload failed')
+          const data = await response.json()
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Upload failed')
+          }
 
           setUploadProgress('Done')
+          setErrorMessage('')
           mutate()
           
           setTimeout(() => setUploadProgress(''), 1000)
         } catch (error) {
+          const message = error instanceof Error ? error.message : 'Upload failed'
           console.error('Upload error:', error)
           setUploadProgress('Failed')
-          setTimeout(() => setUploadProgress(''), 1500)
+          setErrorMessage(message)
+          setTimeout(() => {
+            setUploadProgress('')
+            setErrorMessage('')
+          }, 3000)
         } finally {
           setIsUploading(false)
         }
@@ -101,29 +112,36 @@ export function PasteZone() {
 
   return (
     <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b p-3">
-        <div className="flex items-center gap-2">
-          <ImageIcon className="h-4 w-4" />
-          <span className="text-sm font-medium">Images</span>
-          <span className="text-xs text-muted-foreground">(Ctrl+V to paste)</span>
-          {isUploading && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {uploadProgress}
-            </div>
-          )}
-          {!isUploading && uploadProgress && (
-            <span className="text-xs text-muted-foreground">{uploadProgress}</span>
-          )}
+      <div className="border-b p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="h-4 w-4" />
+            <span className="text-sm font-medium">Images</span>
+            <span className="text-xs text-muted-foreground">(Ctrl+V to paste)</span>
+            {isUploading && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {uploadProgress}
+              </div>
+            )}
+            {!isUploading && uploadProgress && (
+              <span className="text-xs text-muted-foreground">{uploadProgress}</span>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => mutate()}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => mutate()}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-        </Button>
+        {errorMessage && (
+          <div className="mt-2 rounded bg-destructive/10 p-2 text-xs text-destructive">
+            {errorMessage}
+          </div>
+        )}
       </div>
 
       {images.length === 0 ? (
