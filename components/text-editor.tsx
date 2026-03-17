@@ -18,20 +18,19 @@ export function TextEditor() {
   const lastTypingTime = useRef(0)
   const isFocused = useRef(false)
 
-  // Real-time sync - poll every 2 seconds for updates from other devices
+  // Real-time sync - poll every 500ms for instant updates from other devices
   const { data, mutate } = useSWR<{ content: string; updatedAt: string | null }>(
     '/api/note',
     fetcher,
     {
-      refreshInterval: 2000,
-      revalidateOnFocus: false,
-      dedupingInterval: 1000,
+      refreshInterval: 500,
+      revalidateOnFocus: true,
+      dedupingInterval: 300,
     }
   )
 
-  // Sync remote changes to local state ONLY if:
-  // 1. User is not focused on textarea, OR
-  // 2. User hasn't typed in the last 3 seconds AND remote content differs from last saved
+  // Sync remote changes to local state
+  // Only skip if user is actively typing (within 1.5 seconds)
   useEffect(() => {
     if (data?.content === undefined) return
     
@@ -39,17 +38,21 @@ export function TextEditor() {
     const timeSinceTyping = now - lastTypingTime.current
     const remoteContent = data.content || ''
     
-    // If user is actively typing (within 3 seconds), don't overwrite
-    if (timeSinceTyping < 3000 && isFocused.current) {
+    // If user typed very recently (within 1.5s) and is focused, don't overwrite
+    if (timeSinceTyping < 1500 && isFocused.current) {
       return
     }
     
-    // If content from server is different from what we last saved, update
-    if (remoteContent !== lastSavedText) {
+    // Update local text if remote is different
+    if (remoteContent !== localText && remoteContent !== lastSavedText) {
+      setLocalText(remoteContent)
+      setLastSavedText(remoteContent)
+    } else if (!isFocused.current && remoteContent !== localText) {
+      // If not focused, always sync from server
       setLocalText(remoteContent)
       setLastSavedText(remoteContent)
     }
-  }, [data?.content, lastSavedText])
+  }, [data?.content, data?.updatedAt])
 
   // Auto-save function
   const saveText = useCallback(async (content: string) => {
@@ -78,7 +81,7 @@ export function TextEditor() {
     }
   }, [mutate])
 
-  // Real-time auto-save with debounce (300ms after user stops typing)
+  // Real-time auto-save with debounce (150ms after user stops typing for instant sync)
   const handleTextChange = (newText: string) => {
     lastTypingTime.current = Date.now()
     setLocalText(newText)
@@ -89,7 +92,7 @@ export function TextEditor() {
 
     saveTimeoutRef.current = setTimeout(() => {
       saveText(newText)
-    }, 300)
+    }, 150)
   }
 
   const handleFocus = () => {
