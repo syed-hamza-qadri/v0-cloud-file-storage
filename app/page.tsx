@@ -14,9 +14,9 @@ export default function CloudStoragePage() {
     '/api/files',
     fetcher,
     {
-      revalidateOnFocus: false,
+      revalidateOnFocus: true,
       dedupingInterval: 500,
-      refreshInterval: 0,
+      refreshInterval: 3000,
     }
   )
 
@@ -97,9 +97,9 @@ export default function CloudStoragePage() {
           </div>
         </div>
 
-        {/* Text Editor - Save text with exact formatting */}
+        {/* Real-time Shared Text - Syncs across all devices */}
         <section className="mb-6">
-          <TextEditor onSaveComplete={handleUploadComplete} />
+          <TextEditor />
         </section>
 
         {/* Upload Zone */}
