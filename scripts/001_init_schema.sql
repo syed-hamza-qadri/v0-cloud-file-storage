@@ -8,8 +8,7 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Only keep one note record, so add unique constraint
-ALTER TABLE notes ADD CONSTRAINT only_one_note CHECK (id = (SELECT id FROM notes LIMIT 1));
+-- Application logic ensures only one note record exists
 
 -- 2. Files table (for uploaded files)
 CREATE TABLE IF NOT EXISTS files (
