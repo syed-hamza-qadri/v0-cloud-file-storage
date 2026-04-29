@@ -1,47 +1,25 @@
-import { list } from '@vercel/blob'
-import { type NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseServer } from '@/lib/supabase'
 
-// Use edge runtime for fastest response
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
-    // Support pagination cursor for large file lists
-    const cursor = request.nextUrl.searchParams.get('cursor') || undefined
     const limit = parseInt(request.nextUrl.searchParams.get('limit') || '100')
 
-    const { blobs, cursor: nextCursor, hasMore } = await list({
-      cursor,
-      limit,
-    })
+    const { data: files, error } = await supabaseServer
+      .from('files')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
 
-    const files = blobs.map((blob) => {
-      // Extract original filename (remove timestamp prefix)
-      const pathname = blob.pathname
-      const parts = pathname.split('/')
-      const fullName = parts[parts.length - 1] || 'unknown'
-      // Remove timestamp prefix if present (format: timestamp-filename)
-      const filename = fullName.includes('-') 
-        ? fullName.substring(fullName.indexOf('-') + 1)
-        : fullName
-
-      return {
-        url: blob.url,
-        pathname: blob.pathname,
-        filename,
-        size: blob.size,
-        uploadedAt: blob.uploadedAt,
-        contentType: blob.contentType || 'application/octet-stream',
-      }
-    })
-
-    // Sort by upload date (newest first)
-    files.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+    if (error) {
+      console.error('Supabase error:', error)
+      return NextResponse.json({ files: [] })
+    }
 
     return NextResponse.json({ 
-      files,
-      nextCursor: hasMore ? nextCursor : null,
-      hasMore,
+      files: files || [],
     }, {
       headers: {
         'Cache-Control': 'private, no-cache',
@@ -49,6 +27,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error listing files:', error)
-    return NextResponse.json({ error: 'Failed to list files' }, { status: 500 })
+    return NextResponse.json({ files: [] })
   }
 }

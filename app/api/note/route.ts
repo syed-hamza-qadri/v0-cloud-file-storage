@@ -1,30 +1,29 @@
-import { put, list, get, del } from '@vercel/blob'
 import { type NextRequest, NextResponse } from 'next/server'
+import { supabaseServer } from '@/lib/supabase'
 
-export const runtime = 'edge'
-
-const NOTE_KEY = 'shared-note.txt'
+export const runtime = 'nodejs'
 
 // GET - Fetch the current shared note
 export async function GET() {
   try {
-    const { blobs } = await list({ prefix: NOTE_KEY })
-    
-    if (blobs.length === 0) {
+    const { data: note, error } = await supabaseServer
+      .from('notes')
+      .select('*')
+      .limit(1)
+      .single()
+
+    if (error?.code === 'PGRST116') {
+      // No records found
       return NextResponse.json({ content: '', updatedAt: null })
     }
 
-    const result = await get(blobs[0].pathname, { access: 'private' })
-    
-    if (!result) {
-      return NextResponse.json({ content: '', updatedAt: null })
+    if (error) {
+      throw error
     }
 
-    const content = await new Response(result.stream).text()
-    
     return NextResponse.json({ 
-      content, 
-      updatedAt: blobs[0].uploadedAt 
+      content: note?.content || '', 
+      updatedAt: note?.updated_at
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -36,29 +35,31 @@ export async function GET() {
   }
 }
 
-// POST - Save the shared note
+// POST - Save the shared note (upsert)
 export async function POST(request: NextRequest) {
   try {
     const { content } = await request.json()
-    
-    // Delete old notes first
-    const { blobs } = await list({ prefix: NOTE_KEY })
-    for (const blob of blobs) {
-      await del(blob.pathname)
-    }
 
-    if (!content || content.trim() === '') {
-      return NextResponse.json({ success: true, updatedAt: new Date().toISOString() })
-    }
+    // Get or create note with ID 1 (singleton pattern)
+    const { data: note, error: upsertError } = await supabaseServer
+      .from('notes')
+      .upsert({
+        id: 1,
+        content: content || '',
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'id'
+      })
+      .select()
+      .single()
 
-    const blob = await put(NOTE_KEY, content, {
-      access: 'private',
-      addRandomSuffix: false,
-    })
+    if (upsertError) {
+      throw upsertError
+    }
 
     return NextResponse.json({ 
       success: true, 
-      updatedAt: blob.uploadedAt 
+      updatedAt: note?.updated_at
     })
   } catch (error) {
     console.error('Error saving note:', error)
@@ -69,10 +70,15 @@ export async function POST(request: NextRequest) {
 // DELETE - Clear the shared note
 export async function DELETE() {
   try {
-    const { blobs } = await list({ prefix: NOTE_KEY })
-    for (const blob of blobs) {
-      await del(blob.pathname)
+    const { error } = await supabaseServer
+      .from('notes')
+      .delete()
+      .eq('id', 1)
+
+    if (error) {
+      throw error
     }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting note:', error)

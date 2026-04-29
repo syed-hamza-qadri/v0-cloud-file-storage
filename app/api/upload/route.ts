@@ -1,8 +1,7 @@
-import { put } from '@vercel/blob'
-import { type NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseServer } from '@/lib/supabase'
 
-// Disable body parsing to enable streaming for large files
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,38 +14,48 @@ export async function POST(request: NextRequest) {
 
     // Generate a unique filename with timestamp
     const timestamp = Date.now()
-    const filename = `${timestamp}-${file.name}`
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const storageName = `${timestamp}-${sanitizedName}`
 
-    // Use private access for secure file storage
-    const blob = await put(filename, file, {
-      access: 'private',
-      addRandomSuffix: false,
-    })
+    // Upload to Supabase Storage
+    const { error: uploadError, data } = await supabaseServer.storage
+      .from('files')
+      .upload(storageName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      throw uploadError
+    }
+
+    // Insert metadata into database
+    const { data: record, error: dbError } = await supabaseServer
+      .from('files')
+      .insert({
+        filename: file.name,
+        storage_path: `files/${storageName}`,
+        size: file.size,
+        content_type: file.type,
+      })
+      .select()
+      .single()
+
+    if (dbError) {
+      throw dbError
+    }
 
     return NextResponse.json({
-      url: blob.url,
-      pathname: blob.pathname,
+      id: record?.id,
+      pathname: record?.storage_path,
       filename: file.name,
       size: file.size,
-      contentType: blob.contentType,
-      uploadedAt: blob.uploadedAt,
+      contentType: file.type,
+      created_at: record?.created_at,
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Upload failed'
     console.error('Upload error:', error)
-    
-    // Handle specific Blob errors
-    if (errorMessage.includes('suspended')) {
-      return NextResponse.json({ 
-        error: 'Storage suspended - Check your Vercel Blob account status and billing' 
-      }, { status: 503 })
-    }
-    if (errorMessage.includes('quota')) {
-      return NextResponse.json({ 
-        error: 'Storage quota exceeded - Delete some files or upgrade your plan' 
-      }, { status: 507 })
-    }
-    
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

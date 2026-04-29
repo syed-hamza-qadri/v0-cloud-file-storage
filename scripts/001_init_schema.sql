@@ -1,76 +1,56 @@
--- Create tables for CloudVault (replacing Vercel Blob with Supabase)
+-- CloudVault Database Schema (Supabase PostgreSQL)
 
--- 1. Shared notes table (for real-time text sync)
+-- 1. Notes table - shared text that syncs across all devices
 CREATE TABLE IF NOT EXISTS notes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id BIGSERIAL PRIMARY KEY,
   content TEXT DEFAULT '',
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Application logic ensures only one note record exists
-
--- 2. Files table (for uploaded files)
+-- 2. Files table - metadata for uploaded files
 CREATE TABLE IF NOT EXISTS files (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id BIGSERIAL PRIMARY KEY,
   filename TEXT NOT NULL,
-  original_filename TEXT NOT NULL,
-  size INTEGER NOT NULL,
-  content_type TEXT NOT NULL,
-  bucket_name TEXT NOT NULL DEFAULT 'files',
   storage_path TEXT NOT NULL UNIQUE,
-  uploaded_at TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  size BIGINT NOT NULL,
+  content_type TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_files_uploaded_at ON files(uploaded_at DESC);
-
--- 3. Images table (for pasted images)
+-- 3. Images table - metadata for pasted images
 CREATE TABLE IF NOT EXISTS images (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id BIGSERIAL PRIMARY KEY,
   filename TEXT NOT NULL,
-  bucket_name TEXT NOT NULL DEFAULT 'images',
   storage_path TEXT NOT NULL UNIQUE,
-  uploaded_at TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  size BIGINT,
+  content_type TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_images_uploaded_at ON images(uploaded_at DESC);
+-- Indexes for fast queries
+CREATE INDEX IF NOT EXISTS idx_files_created_at ON files(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at DESC);
 
--- Enable RLS (Row Level Security) - allow public read/write for demo
--- In production, you'd restrict this to authenticated users
+-- Enable RLS
 ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE images ENABLE ROW LEVEL SECURITY;
 
--- Allow public access (no auth required for demo)
-CREATE POLICY "Allow public read" ON notes FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON notes FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update" ON notes FOR UPDATE USING (true);
-CREATE POLICY "Allow public delete" ON notes FOR DELETE USING (true);
+-- Policies for notes table
+CREATE POLICY notes_select ON notes FOR SELECT USING (true);
+CREATE POLICY notes_insert ON notes FOR INSERT WITH CHECK (true);
+CREATE POLICY notes_update ON notes FOR UPDATE USING (true);
+CREATE POLICY notes_delete ON notes FOR DELETE USING (true);
 
-CREATE POLICY "Allow public read" ON files FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON files FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public delete" ON files FOR DELETE USING (true);
+-- Policies for files table
+CREATE POLICY files_select ON files FOR SELECT USING (true);
+CREATE POLICY files_insert ON files FOR INSERT WITH CHECK (true);
+CREATE POLICY files_delete ON files FOR DELETE USING (true);
 
-CREATE POLICY "Allow public read" ON images FOR SELECT USING (true);
-CREATE POLICY "Allow public insert" ON images FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public delete" ON images FOR DELETE USING (true);
+-- Policies for images table
+CREATE POLICY images_select ON images FOR SELECT USING (true);
+CREATE POLICY images_insert ON images FOR INSERT WITH CHECK (true);
+CREATE POLICY images_delete ON images FOR DELETE USING (true);
 
--- Insert initial empty note
-INSERT INTO notes (content) VALUES ('') ON CONFLICT DO NOTHING;
-
--- Create storage buckets
-INSERT INTO storage.buckets (id, name, public) VALUES 
-  ('files', 'files', true),
-  ('images', 'images', true)
-ON CONFLICT DO NOTHING;
-
--- Allow public access to storage buckets
-CREATE POLICY "Allow public read files" ON storage.objects FOR SELECT USING (bucket_id = 'files');
-CREATE POLICY "Allow public upload files" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'files');
-CREATE POLICY "Allow public delete files" ON storage.objects FOR DELETE USING (bucket_id = 'files');
-
-CREATE POLICY "Allow public read images" ON storage.objects FOR SELECT USING (bucket_id = 'images');
-CREATE POLICY "Allow public upload images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'images');
-CREATE POLICY "Allow public delete images" ON storage.objects FOR DELETE USING (bucket_id = 'images');
+-- Insert initial note record
+INSERT INTO notes (id, content) VALUES (1, '') ON CONFLICT DO NOTHING;
